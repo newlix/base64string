@@ -2,10 +2,14 @@ package lambdapb
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
-	"fmt"
 	"testing"
 
+	"github.com/golang/protobuf/proto"
+	"github.com/newlix/lambdapb"
+	"github.com/newlix/lambdapb/testdata"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,190 +21,94 @@ func TestInvalidHandlers(t *testing.T) {
 		expected error
 	}{
 		{
-			name:     "nil f",
-			expected: errors.New("f is nil"),
+			name:     "nil handler",
+			expected: errors.New("handler is nil"),
 			handler:  nil,
 		},
 		{
-			name:     "f is not a function",
-			expected: errors.New("f is struct not func"),
+			name:     "handler is not a function",
+			expected: errors.New("handler is not function"),
 			handler:  struct{}{},
 		},
 		{
 			name:     "handler declares too many arguments",
-			expected: errors.New("handlers may not take more than two arguments, but handler takes 3"),
+			expected: errors.New("handler takes two arguments, but got 3"),
 			handler: func(n context.Context, x string, y string) error {
 				return nil
 			},
 		},
 		{
-			name:     "two argument handler does not context as first argument",
-			expected: errors.New("handler takes two arguments, but the first is not Context. got string"),
+			name:     "handler first argument is not Context",
+			expected: errors.New("handler first argument should implement Context"),
 			handler: func(a string, x context.Context) error {
 				return nil
 			},
 		},
 		{
+			name:     "handler second argument is not proto.Message",
+			expected: errors.New("handler second argument should implement proto.Message"),
+			handler: func(ctx context.Context, in string) error {
+				return nil
+			},
+		},
+		{
 			name:     "handler returns too many values",
-			expected: errors.New("handler may not return more than two values"),
-			handler: func() (error, error, error) {
+			expected: errors.New("handler returns two values, but got 3"),
+			handler: func(ctx context.Context, in *testdata.Input) (error, error, error) {
 				return nil, nil, nil
 			},
 		},
 		{
-			name:     "handler returning two values does not declare error as the second return value",
-			expected: errors.New("handler returns two values, but the second does not implement error"),
-			handler: func() (error, string) {
-				return nil, "hello"
+			name:     "handler first return value should implement proto.Message",
+			expected: errors.New("handler first return value should implement proto.Message"),
+			handler: func(ctx context.Context, in *testdata.Input) (error, error) {
+				return nil, nil
 			},
 		},
 		{
 			name:     "handler returning a single value does not implement error",
-			expected: errors.New("handler returns a single value, but it does not implement error"),
-			handler: func() string {
-				return "hello"
-			},
-		},
-		{
-			name:     "no return value should not result in error",
-			expected: nil,
-			handler: func() {
+			expected: errors.New("handler second return value should implement error"),
+			handler: func(ctx context.Context, in *testdata.Input) (*testdata.Output, string) {
+				return nil, ""
 			},
 		},
 	}
-	for i, testCase := range testCases {
-		t.Run(fmt.Sprintf("testCase[%d] %s", i, testCase.name), func(t *testing.T) {
-			lambdaHandler := NewHandler(testCase.handler)
-			_, err := lambdaHandler.Invoke(context.TODO(), make([]byte, 0))
-			assert.Equal(t, testCase.expected, err)
-		})
+	for _, testCase := range testCases {
+		lambdaHandler := NewHandler(testCase.handler)
+		_, err := lambdaHandler.Invoke(context.TODO(), make([]byte, 0))
+		assert.Equal(t, testCase.expected, err)
 	}
 }
 
-// type expected struct {
-// 	val string
-// 	err error
-// }
+type expected struct {
+	val string
+	err error
+}
 
-// func TestInvokes(t *testing.T) {
-// 	hello := func(s string) string {
-// 		return fmt.Sprintf("Hello %s!", s)
-// 	}
-// 	hellop := func(s *string) *string {
-// 		v := hello(*s)
-// 		return &v
-// 	}
-
-// 	testCases := []struct {
-// 		name     string
-// 		input    string
-// 		expected expected
-// 		handler  interface{}
-// 	}{
-// 		{
-// 			input:    `"Lambda"`,
-// 			expected: expected{`"Hello Lambda!"`, nil},
-// 			handler: func(name string) (string, error) {
-// 				return hello(name), nil
-// 			},
-// 		},
-// 		{
-// 			input:    `"Lambda"`,
-// 			expected: expected{`"Hello Lambda!"`, nil},
-// 			handler: func(name string) (string, error) {
-// 				return hello(name), nil
-// 			},
-// 		},
-// 		{
-// 			input:    `"Lambda"`,
-// 			expected: expected{`"Hello Lambda!"`, nil},
-// 			handler: func(ctx context.Context, name string) (string, error) {
-// 				return hello(name), nil
-// 			},
-// 		},
-// 		{
-// 			input:    `"Lambda"`,
-// 			expected: expected{`"Hello Lambda!"`, nil},
-// 			handler: func(name *string) (*string, error) {
-// 				return hellop(name), nil
-// 			},
-// 		},
-// 		{
-// 			input:    `"Lambda"`,
-// 			expected: expected{`"Hello Lambda!"`, nil},
-// 			handler: func(name *string) (*string, error) {
-// 				return hellop(name), nil
-// 			},
-// 		},
-// 		{
-// 			input:    `"Lambda"`,
-// 			expected: expected{`"Hello Lambda!"`, nil},
-// 			handler: func(ctx context.Context, name *string) (*string, error) {
-// 				return hellop(name), nil
-// 			},
-// 		},
-// 		{
-// 			input:    `"Lambda"`,
-// 			expected: expected{"", errors.New("bad stuff")},
-// 			handler: func() error {
-// 				return errors.New("bad stuff")
-// 			},
-// 		},
-// 		{
-// 			input:    `"Lambda"`,
-// 			expected: expected{"", errors.New("bad stuff")},
-// 			handler: func() (interface{}, error) {
-// 				return nil, errors.New("bad stuff")
-// 			},
-// 		},
-// 		{
-// 			input:    `"Lambda"`,
-// 			expected: expected{"", errors.New("bad stuff")},
-// 			handler: func(e interface{}) (interface{}, error) {
-// 				return nil, errors.New("bad stuff")
-// 			},
-// 		},
-// 		{
-// 			input:    `"Lambda"`,
-// 			expected: expected{"", errors.New("bad stuff")},
-// 			handler: func(ctx context.Context, e interface{}) (interface{}, error) {
-// 				return nil, errors.New("bad stuff")
-// 			},
-// 		},
-// 		{
-// 			name:     "basic input struct serialization",
-// 			input:    `{"custom":9001}`,
-// 			expected: expected{`9001`, nil},
-// 			handler: func(event struct{ Custom int }) (int, error) {
-// 				return event.Custom, nil
-// 			},
-// 		},
-// 		{
-// 			name:     "basic output struct serialization",
-// 			input:    `9001`,
-// 			expected: expected{`{"Number":9001}`, nil},
-// 			handler: func(event int) (struct{ Number int }, error) {
-// 				return struct{ Number int }{event}, nil
-// 			},
-// 		},
-// 	}
-// 	for i, testCase := range testCases {
-// 		t.Run(fmt.Sprintf("testCase[%d] %s", i, testCase.name), func(t *testing.T) {
-// 			lambdaHandler := NewHandler(testCase.handler)
-// 			response, err := lambdaHandler.Invoke(context.TODO(), []byte(testCase.input))
-// 			if testCase.expected.err != nil {
-// 				assert.Equal(t, testCase.expected.err, err)
-// 			} else {
-// 				assert.NoError(t, err)
-// 				assert.Equal(t, testCase.expected.val, string(response))
-// 			}
-// 		})
-// 	}
-// }
-
-// func TestInvalidJsonInput(t *testing.T) {
-// 	lambdaHandler := NewHandler(func(s string) error { return nil })
-// 	_, err := lambdaHandler.Invoke(context.TODO(), []byte(`{"invalid json`))
-// 	assert.Equal(t, "unexpected end of JSON input", err.Error())
-
-// }
+func TestNewHandler(t *testing.T) {
+	in := &testdata.Input{
+		S: "s",
+		D: 3.14,
+		I: 1,
+		B: true,
+	}
+	h := lambdapb.NewHandler(testdata.Echo)
+	bIn, err := proto.Marshal(in)
+	assert.NoError(t, err)
+	base64In := base64.StdEncoding.EncodeToString(bIn)
+	jsonOut, err := h.Invoke(context.Background(), []byte("\""+base64In+"\""))
+	var base64Out string
+	if err := json.Unmarshal(jsonOut, &base64Out); err != nil {
+		t.Error(err)
+	}
+	bOut, err := base64.StdEncoding.DecodeString(base64Out)
+	assert.NoError(t, err)
+	var out testdata.Output
+	if err := proto.Unmarshal(bOut, &out); err != nil {
+		t.Error(err)
+	}
+	assert.Equal(t, in.S, out.S)
+	assert.InDelta(t, in.D, out.D, 0.001)
+	assert.Equal(t, in.I, out.I)
+	assert.Equal(t, in.B, out.B)
+}

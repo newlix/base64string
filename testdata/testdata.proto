@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package testdata;
+
+message Input{
+	string s = 1;
+	double d = 2;
+	int32 i = 4;
+	bool b = 3;
+}
+
+message Output{
+	string s = 5;
+	double d = 6;
+	int32 i = 7;
+	bool b = 1;
+}
