@@ -80,12 +80,7 @@ func TestInvalidHandlers(t *testing.T) {
 	}
 }
 
-type expected struct {
-	val string
-	err error
-}
-
-func TestNewHandler(t *testing.T) {
+func TestNewHandlerInvoke(t *testing.T) {
 	in := &testdata.Input{
 		S: "s",
 		D: 3.14,
@@ -111,4 +106,20 @@ func TestNewHandler(t *testing.T) {
 	assert.InDelta(t, in.D, out.D, 0.001)
 	assert.Equal(t, in.I, out.I)
 	assert.Equal(t, in.B, out.B)
+}
+
+func TestNewHandlerInvokeErr(t *testing.T) {
+	in := &testdata.Input{
+		S: "s",
+		D: 3.14,
+		I: 1,
+		B: true,
+	}
+	h := lambdapb.NewHandler(testdata.Err)
+	bIn, err := proto.Marshal(in)
+	assert.NoError(t, err)
+	base64In := base64.StdEncoding.EncodeToString(bIn)
+	jsonOut, err := h.Invoke(context.Background(), []byte("\""+base64In+"\""))
+	assert.Nil(t, jsonOut)
+	assert.Error(t, err, "err")
 }
