@@ -10,7 +10,6 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/newlix/lambdapb"
 	"github.com/newlix/lambdapb/testdata"
-	_ "github.com/stretchr/testify"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -75,7 +74,7 @@ func TestInvalidHandlers(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		lambdaHandler := NewHandler(testCase.handler)
+		lambdaHandler := lambdapb.NewHandler(testCase.handler)
 		_, err := lambdaHandler.Invoke(context.TODO(), make([]byte, 0))
 		assert.Equal(t, testCase.expected, err)
 	}
