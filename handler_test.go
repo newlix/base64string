@@ -1,4 +1,4 @@
-package lambdapb
+package lambdapb_test
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/newlix/lambdapb"
 	"github.com/newlix/lambdapb/testdata"
+	_ "github.com/stretchr/testify"
 	"github.com/stretchr/testify/assert"
 )
 
