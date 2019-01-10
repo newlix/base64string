@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"reflect"
 
+	raven "github.com/getsentry/raven-go"
 	"github.com/golang/protobuf/proto"
 )
 
@@ -16,8 +17,11 @@ type Handler func(context.Context, []byte) ([]byte, error)
 
 // Invoke calls the handler, and serializes the response.
 // If the underlying handler returned an error, or an error occurs during serialization, error is returned.
-func (h Handler) Invoke(ctx context.Context, payload []byte) ([]byte, error) {
-	return h(ctx, payload)
+func (h Handler) Invoke(ctx context.Context, payload []byte) (b []byte, err error) {
+	raven.CapturePanic(func() {
+		b, err = h(ctx, payload)
+	}, nil)
+	return
 }
 
 func errorHandler(e error) Handler {
